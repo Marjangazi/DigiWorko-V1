@@ -82,6 +82,11 @@ create table if not exists assets_config (
   created_at        timestamptz default now()
 );
 
+-- Ensure column exists if table was already created without it
+alter table assets_config add column if not exists worker_gross_gen numeric not null default 6;
+alter table assets_config add column if not exists investor_roi numeric not null default 2;
+alter table assets_config add column if not exists sort_order int default 0;
+
 alter table assets_config enable row level security;
 -- Everyone can read active assets
 drop policy if exists "assets_config_select" on assets_config;
