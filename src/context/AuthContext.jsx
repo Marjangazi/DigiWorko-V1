@@ -10,34 +10,57 @@ export function AuthProvider({ children }) {
   const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
-    // Safety timeout to prevent infinite loading if Supabase is unreachable
-    const timeout = setTimeout(() => {
-      if (loading) setLoading(false)
-    }, 10000)
+    // Check if we are in the middle of an OAuth redirect (hash contains tokens)
+    const hasHash = window.location.hash && (
+      window.location.hash.includes('access_token=') || 
+      window.location.hash.includes('error=')
+    );
 
+    console.log('Initial Auth Check - Hash present:', !!hasHash);
+
+    // Initial session check
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        if (session?.user) ensureProfile(session.user)
-        else setLoading(false)
+        console.log('Initial Session Fetch:', session ? 'User Found' : 'No Session');
+        if (session) {
+          setSession(session)
+          setUser(session.user)
+          ensureProfile(session.user)
+        } else if (!hasHash) {
+          // Only stop loading if there's no hash to process
+          // If there IS a hash, we wait for onAuthStateChange to fire
+          setLoading(false)
+        }
       })
       .catch(err => {
         console.error('getSession error:', err)
-        setLoading(false)
+        if (!hasHash) setLoading(false)
       })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth State Event:', event, session ? 'Session Active' : 'No Session');
+        
         setSession(session)
         setUser(session?.user ?? null)
-        if (session?.user) await ensureProfile(session.user)
-        else { setProfile(null); setLoading(false) }
+        
+        if (session?.user) {
+          await ensureProfile(session.user)
+        } else {
+          setProfile(null)
+          // If we are not waiting for a hash, stop loading
+          if (!hasHash || event === 'SIGNED_OUT') setLoading(false)
+        }
       }
     )
 
+    // Safety fallback: eventually stop loading anyway
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false)
+    }, 6000)
+
     return () => {
-      clearTimeout(timeout)
+      clearTimeout(safetyTimeout)
       subscription.unsubscribe()
     }
   }, [])
