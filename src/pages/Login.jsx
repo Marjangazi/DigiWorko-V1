@@ -19,8 +19,15 @@ export default function Login() {
     // Capture referral code from URL
     const params = new URLSearchParams(window.location.search)
     const ref = params.get('ref')
+    const errorMsg = params.get('error_description') || params.get('error')
+
     if (ref) {
       localStorage.setItem('dg_referral_code', ref)
+    }
+
+    if (errorMsg) {
+      console.error('Auth redirect error:', errorMsg)
+      // You could set localized error state here
     }
 
     if (!loading && session) {

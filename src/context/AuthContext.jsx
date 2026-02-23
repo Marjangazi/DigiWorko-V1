@@ -43,13 +43,16 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function ensureProfile(user) {
+    if (!user) return
     try {
       // Use maybeSingle to avoid 406/error if profile doesn't exist yet
-      const { data: existing } = await supabase
+      const { data: existing, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .maybeSingle()
+
+      if (fetchError) throw fetchError
 
       // Robust check for Google provider
       const isGoogleUser = user.app_metadata?.provider === 'google' || 
@@ -70,7 +73,7 @@ export function AuthProvider({ children }) {
           if (referrer) referredBy = referrer.id
         }
 
-        const { data: newProfile } = await supabase
+        const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert({
             id: user.id,
@@ -79,12 +82,17 @@ export function AuthProvider({ children }) {
             balance: 7200,
             referral_code: referralCode,
             referred_by: referredBy,
-            is_verified: isGoogleUser, // Auto verify via gmail
+            is_verified: isGoogleUser, 
           })
           .select()
           .maybeSingle()
         
-        if (newProfile) {
+        // Handle concurrent insert case (e.g. if a DB trigger already created the profile)
+        if (insertError && insertError.code === '23505') {
+          // Profile exists now, fetch it
+          const { data: refetched } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+          setProfile(refetched)
+        } else if (newProfile) {
           setProfile(newProfile)
           localStorage.removeItem('dg_referral_code')
         }
@@ -93,7 +101,7 @@ export function AuthProvider({ children }) {
         if (isGoogleUser && !existing.is_verified) {
           const { data: updated } = await supabase
             .from('profiles')
-            .update({ is_verified: true })
+              .update({ is_verified: true })
             .eq('id', user.id)
             .select()
             .maybeSingle()
@@ -103,7 +111,7 @@ export function AuthProvider({ children }) {
         }
       }
     } catch (err) {
-      console.error('ensureProfile:', err)
+      console.error('ensureProfile Error:', err)
     } finally {
       setLoading(false)
     }
@@ -117,13 +125,22 @@ export function AuthProvider({ children }) {
   }
 
   async function signInWithGoogle() {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { 
-        redirectTo: window.location.origin,
-        queryParams: { prompt: 'select_account' }
-      },
-    })
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { 
+          redirectTo: `${window.location.origin}/`,
+          queryParams: {
+            prompt: 'select_account',
+            access_type: 'offline',
+          }
+        },
+      })
+      if (error) throw error
+    } catch (err) {
+      console.error('Auth Error:', err.message)
+      alert('Google Login failed: ' + err.message)
+    }
   }
 
   async function signOut() {
