@@ -162,126 +162,138 @@ export default function Shop() {
           </button>
         </div>
 
-        {activeTab === 'assets' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {shopItems.map(item => {
-              const basePrice   = item.price_coins
-              const currentPrice = isVaultActive ? basePrice - (basePrice * (flashSale.discount / 100)) : basePrice
-              
-              const isInvestor = selectedModes[item.id] === 'investor'
-              const roiToUse = isInvestor ? item.investor_roi : (item.worker_gross_gen || item.monthly_roi)
-              
-              const baseEarn    = (basePrice * (roiToUse / 100)) / 30
-              const bonusEarn   = isVaultActive ? (basePrice * ((roiToUse + flashSale.bonus) / 100)) / 30 - baseEarn : 0
-              const dailyEarn   = baseEarn + bonusEarn
-              
-              const dailyMaint  = isInvestor ? 0 : (basePrice * (item.maintenance_fee / 100)) / 30
-              const netPerDay   = dailyEarn - dailyMaint
-              const canAfford   = (profile?.balance ?? 0) >= currentPrice
-              
-              const isGold = isVaultActive
-
-            return (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ y: -5 }}
-                transition={{ duration: 0.3 }}
-                key={item.id}
-                className={`glass-card p-6 relative overflow-hidden flex flex-col transition-all duration-300
-                  ${canAfford ? (selectedModes[item.id] === 'investor' ? 'border-accent-500/40 shadow-[0_0_15px_rgba(250,204,21,0.2)]' : 'border-primary-500/30 hover:border-primary-400 hover:shadow-neon-glow') : 'border-white/10 opacity-80'}`}
-              >
-                <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-3xl ${selectedModes[item.id] === 'investor' ? 'bg-accent-500/20' : 'bg-primary-500/20'}`} />
-
-                {/* Icon & name */}
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`relative w-14 h-14 rounded-xl bg-gradient-to-br border flex items-center justify-center text-3xl
-                    ${selectedModes[item.id] === 'investor' ? 'from-accent-500/20 to-orange-500/20 border-accent-500/50 shadow-[0_0_15px_rgba(250,204,21,0.2)]' : 'from-primary-500/20 to-secondary-500/20 border-primary-500/50 shadow-[0_0_15px_rgba(0,243,255,0.2)]'}
-                  `}>
-                    {item.icon}
-                  </div>
-                  <div>
-                    <h3 className="font-black text-white">{item.name}</h3>
-                    <p className="text-xs text-dark-500 uppercase font-bold tracking-tighter">Price: {currentPrice.toLocaleString()} DGC</p>
-                  </div>
-                </div>
-
-                {/* Mode Selector */}
-                <div className="flex bg-dark-800 p-1 rounded-xl mb-4 border border-white/5">
-                  <button 
-                    onClick={() => setSelectedModes({...selectedModes, [item.id]: 'worker'})}
-                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${(!selectedModes[item.id] || selectedModes[item.id] === 'worker') ? 'bg-primary-600 text-white shadow-lg' : 'text-dark-500'}`}
-                  >
-                    Part B: Worker
-                  </button>
-                  <button 
-                    onClick={() => setSelectedModes({...selectedModes, [item.id]: 'investor'})}
-                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${selectedModes[item.id] === 'investor' ? 'bg-accent-600 text-dark-900 shadow-lg' : 'text-dark-500'}`}
-                  >
-                    Part A: Investor
-                  </button>
-                </div>
-
-                {/* Dynamic Stats based on mode */}
-                <div className="space-y-2 mb-5 flex-1 min-h-[120px]">
-                  {(!selectedModes[item.id] || selectedModes[item.id] === 'worker') ? (
-                    <>
-                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                        <span className="text-[10px] text-dark-500 uppercase font-bold">Gross Monthly ROI</span>
-                        <span className="font-bold text-primary-400">{item.worker_gross_gen}%</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                        <span className="text-[10px] text-dark-500 uppercase font-bold">Monthly Rent</span>
-                        <span className="font-bold text-red-500">-{item.maintenance_fee}%</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                        <span className="text-[10px] text-dark-500 uppercase font-bold">Daily Earnings</span>
-                        <span className="font-bold text-green-400">+{((basePrice * (item.worker_gross_gen / 100)) / 30).toFixed(1)} DGC</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1.5 pt-3">
-                        <span className="text-xs text-white font-black uppercase">Net Profit / Month</span>
-                        <span className="font-black text-primary-400">{(item.worker_gross_gen - item.maintenance_fee).toFixed(1)}%</span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                        <span className="text-[10px] text-dark-500 uppercase font-bold">Total Return (30 Days)</span>
-                        <span className="font-bold text-accent-400">{item.investor_roi}% Fixed</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                        <span className="text-[10px] text-dark-500 uppercase font-bold">Capital Status</span>
-                        <span className="font-bold text-white">Full Capital Returned</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                        <span className="text-[10px] text-dark-500 uppercase font-bold">Total Release</span>
-                        <span className="font-bold text-green-400">{(basePrice * (1 + (item.investor_roi / 100))).toLocaleString()} DGC</span>
-                      </div>
-                      <div className="mt-4 p-2 bg-accent-500/5 border border-accent-500/20 rounded-lg text-[9px] text-accent-400 leading-tight">
-                        🔒 Note: Capital + Commission will be locked for 30 days and auto-released to your wallet.
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <button
-                  id={`buy-btn-${item.id}`}
-                  onClick={() => handleBuy(item)}
-                  disabled={buying === item.id || !canAfford}
-                  className={canAfford ? (selectedModes[item.id] === 'investor' ? 'bg-accent-600 hover:bg-accent-500 text-dark-900 w-full py-3 rounded-xl font-black shadow-[0_0_15px_rgba(250,204,21,0.5)] transition-all uppercase tracking-widest text-xs' : 'btn-primary w-full shadow-neon-glow uppercase tracking-widest text-xs py-3') : 'btn-secondary w-full opacity-60 uppercase tracking-widest text-xs py-3'}
-                >
-                  {buying === item.id ? (
-                    <><div className="w-4 h-4 border-2 border-dark-900/50 border-t-dark-900 rounded-full animate-spin inline-block mr-2" /> Processing...</>
-                  ) : canAfford ? (
-                    <>Buy {selectedModes[item.id] === 'investor' ? 'Investor' : 'Worker'} Mode</>
-                  ) : (
-                    <>Need {(currentPrice - Math.floor(profile?.balance ?? 0)).toLocaleString()} DGC</>
-                  )}
-                </button>
-              </motion.div>
-            )
-          })}
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-10 h-10 border-4 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
           </div>
+        ) : activeTab === 'assets' ? (
+          shopItems.length === 0 ? (
+            <div className="glass-card p-12 text-center">
+              <div className="text-5xl mb-4">🛺</div>
+              <h3 className="text-lg font-bold text-white mb-2">Shop is Empty</h3>
+              <p className="text-dark-500 text-sm">No digital assets are available for purchase right now. Check back later!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {shopItems.map(item => {
+                const basePrice   = item.price_coins
+                const currentPrice = isVaultActive ? basePrice - (basePrice * (flashSale.discount / 100)) : basePrice
+                
+                const isInvestor = selectedModes[item.id] === 'investor'
+                const roiToUse = isInvestor ? item.investor_roi : (item.worker_gross_gen || item.monthly_roi)
+                
+                const baseEarn    = (basePrice * (roiToUse / 100)) / 30
+                const bonusEarn   = isVaultActive ? (basePrice * ((roiToUse + flashSale.bonus) / 100)) / 30 - baseEarn : 0
+                const dailyEarn   = baseEarn + bonusEarn
+                
+                const dailyMaint  = isInvestor ? 0 : (basePrice * (item.maintenance_fee / 100)) / 30
+                const netPerDay   = dailyEarn - dailyMaint
+                const canAfford   = (profile?.balance ?? 0) >= currentPrice
+                
+                const isGold = isVaultActive
+
+              return (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ y: -5 }}
+                  transition={{ duration: 0.3 }}
+                  key={item.id}
+                  className={`glass-card p-6 relative overflow-hidden flex flex-col transition-all duration-300
+                    ${canAfford ? (selectedModes[item.id] === 'investor' ? 'border-accent-500/40 shadow-[0_0_15px_rgba(250,204,21,0.2)]' : 'border-primary-500/30 hover:border-primary-400 hover:shadow-neon-glow') : 'border-white/10 opacity-80'}`}
+                >
+                  <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-3xl ${selectedModes[item.id] === 'investor' ? 'bg-accent-500/20' : 'bg-primary-500/20'}`} />
+
+                  {/* Icon & name */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`relative w-14 h-14 rounded-xl bg-gradient-to-br border flex items-center justify-center text-3xl
+                      ${selectedModes[item.id] === 'investor' ? 'from-accent-500/20 to-orange-500/20 border-accent-500/50 shadow-[0_0_15px_rgba(250,204,21,0.2)]' : 'from-primary-500/20 to-secondary-500/20 border-primary-500/50 shadow-[0_0_15px_rgba(0,243,255,0.2)]'}
+                    `}>
+                      {item.icon}
+                    </div>
+                    <div>
+                      <h3 className="font-black text-white">{item.name}</h3>
+                      <p className="text-xs text-dark-500 uppercase font-bold tracking-tighter">Price: {currentPrice.toLocaleString()} DGC</p>
+                    </div>
+                  </div>
+
+                  {/* Mode Selector */}
+                  <div className="flex bg-dark-800 p-1 rounded-xl mb-4 border border-white/5">
+                    <button 
+                      onClick={() => setSelectedModes({...selectedModes, [item.id]: 'worker'})}
+                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${(!selectedModes[item.id] || selectedModes[item.id] === 'worker') ? 'bg-primary-600 text-white shadow-lg' : 'text-dark-500'}`}
+                    >
+                      Part B: Worker
+                    </button>
+                    <button 
+                      onClick={() => setSelectedModes({...selectedModes, [item.id]: 'investor'})}
+                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${selectedModes[item.id] === 'investor' ? 'bg-accent-600 text-dark-900 shadow-lg' : 'text-dark-500'}`}
+                    >
+                      Part A: Investor
+                    </button>
+                  </div>
+
+                  {/* Dynamic Stats based on mode */}
+                  <div className="space-y-2 mb-5 flex-1 min-h-[120px]">
+                    {(!selectedModes[item.id] || selectedModes[item.id] === 'worker') ? (
+                      <>
+                        <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                          <span className="text-[10px] text-dark-500 uppercase font-bold">Gross Monthly ROI</span>
+                          <span className="font-bold text-primary-400">{item.worker_gross_gen}%</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                          <span className="text-[10px] text-dark-500 uppercase font-bold">Monthly Rent</span>
+                          <span className="font-bold text-red-500">-{item.maintenance_fee}%</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                          <span className="text-[10px] text-dark-500 uppercase font-bold">Daily Earnings</span>
+                          <span className="font-bold text-green-400">+{((basePrice * (item.worker_gross_gen / 100)) / 30).toFixed(1)} DGC</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 pt-3">
+                          <span className="text-xs text-white font-black uppercase">Net Profit / Month</span>
+                          <span className="font-black text-primary-400">{(item.worker_gross_gen - item.maintenance_fee).toFixed(1)}%</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                          <span className="text-[10px] text-dark-500 uppercase font-bold">Total Return (30 Days)</span>
+                          <span className="font-bold text-accent-400">{item.investor_roi}% Fixed</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                          <span className="text-[10px] text-dark-500 uppercase font-bold">Capital Status</span>
+                          <span className="font-bold text-white">Full Capital Returned</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                          <span className="text-[10px] text-dark-500 uppercase font-bold">Total Release</span>
+                          <span className="font-bold text-green-400">{(basePrice * (1 + (item.investor_roi / 100))).toLocaleString()} DGC</span>
+                        </div>
+                        <div className="mt-4 p-2 bg-accent-500/5 border border-accent-500/20 rounded-lg text-[9px] text-accent-400 leading-tight">
+                          🔒 Note: Capital + Commission will be locked for 30 days and auto-released to your wallet.
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <button
+                    id={`buy-btn-${item.id}`}
+                    onClick={() => handleBuy(item)}
+                    disabled={buying === item.id || !canAfford}
+                    className={canAfford ? (selectedModes[item.id] === 'investor' ? 'bg-accent-600 hover:bg-accent-500 text-dark-900 w-full py-3 rounded-xl font-black shadow-[0_0_15px_rgba(250,204,21,0.5)] transition-all uppercase tracking-widest text-xs' : 'btn-primary w-full shadow-neon-glow uppercase tracking-widest text-xs py-3') : 'btn-secondary w-full opacity-60 uppercase tracking-widest text-xs py-3'}
+                  >
+                    {buying === item.id ? (
+                      <><div className="w-4 h-4 border-2 border-dark-900/50 border-t-dark-900 rounded-full animate-spin inline-block mr-2" /> Processing...</>
+                    ) : canAfford ? (
+                      <>Buy {selectedModes[item.id] === 'investor' ? 'Investor' : 'Worker'} Mode</>
+                    ) : (
+                      <>Need {(currentPrice - Math.floor(profile?.balance ?? 0)).toLocaleString()} DGC</>
+                    )}
+                  </button>
+                </motion.div>
+              )
+            })}
+            </div>
+          )
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {externalProducts.map(item => {

@@ -82,10 +82,13 @@ create table if not exists assets_config (
   created_at        timestamptz default now()
 );
 
--- Ensure column exists if table was already created without it
+-- Ensure columns exist if table was already created without it
 alter table assets_config add column if not exists worker_gross_gen numeric not null default 6;
 alter table assets_config add column if not exists investor_roi numeric not null default 2;
 alter table assets_config add column if not exists sort_order int default 0;
+
+-- Optional: Clear old/broken entries to ensure a fresh shop state
+-- truncate table assets_config cascade;
 
 alter table assets_config enable row level security;
 -- Everyone can read active assets
@@ -98,30 +101,13 @@ create policy "assets_config_admin_all" on assets_config for all using (
 );
 
 -- Insert default assets
-insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order)
+insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order, is_active)
 values 
-('Riksha', 'Starter asset. Low maintenance, steady earnings.', 7200, 6, 8, 2, 30, '🛺', 1),
-('CNG', 'Middle-tier transport. Higher daily returns.', 36000, 10, 12, 3, 30, '🛗', 2),
-('Truck', 'Heavy-duty earner. Great for scaling.', 72000, 12, 15, 3, 30, '🚚', 3),
-('Excavator', 'High-end mining asset. Maximum profitability.', 360000, 15, 20, 5, 45, '🏗️', 4)
-on conflict (id) do nothing; -- Note: using id or ensuring uniqueness if id is fixed. Since id is uuid, better to use name if it has unique constraint? 
--- Actually, the table doesn't have unique constraint on name. I'll just use a merge-like approach or just insert.
--- Re-defining insert to be safer:
-insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order)
-select 'Riksha', 'Starter asset.', 7200, 6, 8, 2, 30, '🛺', 1
-where not exists (select 1 from assets_config where name = 'Riksha');
-
-insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order)
-select 'CNG', 'Middle-tier transport.', 36000, 10, 12, 3, 30, '🛗', 2
-where not exists (select 1 from assets_config where name = 'CNG');
-
-insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order)
-select 'Truck', 'Heavy-duty earner.', 72000, 12, 15, 3, 30, '🚚', 3
-where not exists (select 1 from assets_config where name = 'Truck');
-
-insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order)
-select 'Excavator', 'High-end mining asset.', 360000, 15, 20, 5, 45, '🏗️', 4
-where not exists (select 1 from assets_config where name = 'Excavator');
+('Riksha', 'Starter asset. Low maintenance.', 7200, 6, 8, 2, 30, '🛺', 1, true),
+('CNG', 'Middle-tier transport.', 36000, 10, 12, 3, 30, '🛗', 2, true),
+('Truck', 'Heavy-duty earner.', 72000, 12, 15, 3, 30, '🚚', 3, true),
+('Excavator', 'High-end mining asset.', 360000, 15, 20, 5, 45, '🏗️', 4, true)
+on conflict do nothing;
 
 -- ─────────────────────────────────────────────────────────────
 -- 3. USER ASSETS TABLE
