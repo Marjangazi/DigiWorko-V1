@@ -28,21 +28,39 @@ create table if not exists profiles (
 );
 
 alter table profiles enable row level security;
+
+-- Security Definer function to check admin status without recursion
+create or replace function public.is_admin_check()
+returns boolean
+language plpgsql
+security definer
+as $$
+begin
+  return exists (
+    select 1 from public.profiles
+    where id = auth.uid()
+    and (is_admin = true or email = 'mdmarzangazi@gmail.com')
+  );
+end;
+$$;
+
 drop policy if exists "profiles_select" on profiles;
-create policy "profiles_select" on profiles for select using (auth.uid() = id);
+create policy "profiles_select" on profiles for select using (
+  auth.uid() = id OR is_admin_check()
+);
+
 drop policy if exists "profiles_update" on profiles;
-create policy "profiles_update" on profiles for update using (auth.uid() = id);
+create policy "profiles_update" on profiles for update using (
+  auth.uid() = id OR is_admin_check()
+);
+
 drop policy if exists "profiles_insert" on profiles;
-create policy "profiles_insert" on profiles for insert with check (auth.uid() = id);
--- Admin can read all profiles
-drop policy if exists "admin_select_all_profiles" on profiles;
-create policy "admin_select_all_profiles" on profiles for select using (
-  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+create policy "profiles_insert" on profiles for insert with check (
+  auth.uid() = id OR is_admin_check()
 );
-drop policy if exists "admin_update_all_profiles" on profiles;
-create policy "admin_update_all_profiles" on profiles for update using (
-  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
-);
+
+-- Ensure the primary owner is an admin in the database
+update profiles set is_admin = true where email = 'mdmarzangazi@gmail.com';
 
 create or replace function trg_initialize_profile()
 returns trigger
@@ -152,7 +170,7 @@ drop policy if exists "user_assets_update" on user_assets;
 create policy "user_assets_update" on user_assets for update using (auth.uid() = user_id);
 drop policy if exists "admin_assets_all" on user_assets;
 create policy "admin_assets_all" on user_assets for all using (
-  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+  is_admin_check()
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -178,7 +196,7 @@ drop policy if exists "trx_insert_own" on transactions;
 -- create policy "trx_insert_own"  on transactions for insert with check (auth.uid() = user_id);
 drop policy if exists "admin_trx_all" on transactions;
 create policy "admin_trx_all"   on transactions for all using (
-  exists (select 1 from profiles where id = auth.uid() and is_admin = true)
+  is_admin_check()
 );
 
 -- ─────────────────────────────────────────────────────────────
