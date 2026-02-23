@@ -5,23 +5,30 @@ import Navbar from '../components/Navbar'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function Admin() {
-  const { profile } = useAuth()
+  const { user, profile } = useAuth()
+  
+  const isAdmin = profile?.is_admin || user?.email === 'mdmarzangazi@gmail.com';
+
   const { 
     allUsers, pendingTrx, vaultStats, allAssets, flashSaleSettings, economyStats, rentLogs, allTournaments, loading, actionMsg,
     toggleVerification, adjustBalance, adjustTKBalance, approveTrx, rejectTrx, updateAssetConfig, updateSystemSettings, addAsset,
     addTournament, deleteTournament
-  } = useAdmin(profile?.is_admin)
+  } = useAdmin(isAdmin)
 
   const [adjustForm, setAdjustForm] = useState({ userId: '', amount: '', type: 'coin', note: '' })
   const [flashForm, setFlashForm] = useState({ discount: 10, bonus: 2, hours: 2, refBonus: 720 })
   const [newAsset, setNewAsset] = useState({ name: '', icon: '🌟', price_coins: '', investor_roi: 2, worker_gross_gen: 6, maintenance_fee: 1 })
   const [showAddAsset, setShowAddAsset] = useState(false)
   const [activeView, setActiveView] = useState('economy') // economy, users, assets, transactions, vault, orders, tournaments
-
   const [tourForm, setTourForm] = useState({ title: '', game: 'Free Fire', entry_fee: 50, prize_pool: '', total_spots: 50, date_time: '', image_url: '' })
   const [showAddTour, setShowAddTour] = useState(false)
 
-  if (!profile?.is_admin) {
+  if (!isAdmin) {
+    console.log('Access Denied Check:', { 
+      db_admin: profile?.is_admin, 
+      email: user?.email, 
+      target: 'mdmarzangazi@gmail.com' 
+    });
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center p-4">
         <div className="glass-card p-12 text-center max-w-md">
