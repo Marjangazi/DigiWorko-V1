@@ -158,14 +158,14 @@ export default function Dashboard() {
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary-500/20 rounded-full blur-3xl group-hover:bg-primary-500/30 transition-all duration-500" />
               <Calendar className="text-primary-400 mb-3" size={32} />
               <h3 className="text-white font-black text-lg mb-1">Daily Reward</h3>
-              <p className="text-dark-400 text-xs mb-4">Get 2x your daily asset income every 24 hours!</p>
+              <p className="text-dark-400 text-xs mb-4">Get a small daily bonus to support your business!</p>
               
               <button
                 onClick={handleDailyCheckin}
                 disabled={checkingIn}
                 className="w-full btn-gold py-2.5 text-sm"
               >
-                {checkingIn ? 'Claiming...' : '🎁 Claim 2x Income'}
+                {checkingIn ? 'Claiming...' : '🎁 Claim +2 DGC'}
               </button>
             </div>
 

@@ -618,16 +618,8 @@ begin
     return json_build_object('success', false, 'error', 'Already checked in today. Please return later.');
   end if;
 
-  -- Calculate total daily income from active worker assets
-  -- Income per day = Price * (Monthly ROI / 100) / 30
-  select coalesce(sum((ac.price_coins * (coalesce(ac.worker_gross_gen, ac.monthly_roi) / 100.0) / 30.0)), 0)
-  into v_daily_income
-  from user_assets ua
-  join assets_config ac on ac.id = ua.asset_id
-  where ua.user_id = v_user_id and ua.status = 'active' and ua.type = 'worker';
-
-  -- Reward is 2x daily income, minimum 10 DGC to be fair to new users
-  v_reward := greatest(v_daily_income * 2, 10);
+  -- Reward is a flat 2 DGC (Business/Investment bonus)
+  v_reward := 2;
 
   -- Update balance and last_checkin_at
   update profiles 
@@ -636,9 +628,9 @@ begin
 
   -- Record transaction
   insert into transactions (user_id, amount, type, status, note)
-  values (v_user_id, v_reward, 'daily_reward', 'completed', 'Daily Check-in Reward (2x Asset Income)');
+  values (v_user_id, v_reward, 'daily_reward', 'completed', 'Daily Check-in Reward (Business Bonus)');
 
-  return json_build_object('success', true, 'message', 'Daily check-in successful! +' || round(v_reward, 2) || ' DGC', 'reward', round(v_reward, 2));
+  return json_build_object('success', true, 'message', 'Daily bonus claimed! +2 DGC', 'reward', v_reward);
 end;
 $$;
 
