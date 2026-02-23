@@ -158,14 +158,14 @@ export default function Dashboard() {
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary-500/20 rounded-full blur-3xl group-hover:bg-primary-500/30 transition-all duration-500" />
               <Calendar className="text-primary-400 mb-3" size={32} />
               <h3 className="text-white font-black text-lg mb-1">Daily Reward</h3>
-              <p className="text-dark-400 text-xs mb-4">Check in every 24h to earn free coins!</p>
+              <p className="text-dark-400 text-xs mb-4">Get 2x your daily asset income every 24 hours!</p>
               
               <button
                 onClick={handleDailyCheckin}
                 disabled={checkingIn}
                 className="w-full btn-gold py-2.5 text-sm"
               >
-                {checkingIn ? 'Checking in...' : '🎁 Claim +100 DGC'}
+                {checkingIn ? 'Claiming...' : '🎁 Claim 2x Income'}
               </button>
             </div>
 
@@ -173,19 +173,15 @@ export default function Dashboard() {
             <div className="sm:col-span-2 lg:col-span-1 glass-card p-6 flex flex-col justify-center items-center text-center relative overflow-hidden group border-pink-500/20">
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-pink-500/20 rounded-full blur-3xl group-hover:bg-pink-500/30 transition-all duration-500" />
               <Zap className="text-pink-400 mb-3" size={32} />
-              <h3 className="text-white font-black text-lg mb-1">2% Boost</h3>
-              <p className="text-dark-400 text-[10px] mb-4">Watch an ad to boost income by 2% for 24 hours.</p>
+              <h3 className="text-white font-black text-lg mb-1">Ad Reward</h3>
+              <p className="text-dark-400 text-[10px] mb-4">Watch a quick ad to earn +10 DGC instantly.</p>
               
               <button
                 onClick={handleWatchAd}
-                disabled={watchingAd || adBoostActive}
-                className={`w-full py-2.5 text-sm font-bold rounded-xl transition-all ${
-                  adBoostActive 
-                    ? 'bg-green-500/20 text-green-400 cursor-not-allowed border border-green-500/30' 
-                    : 'bg-gradient-to-r from-pink-600 to-purple-600 text-white hover:shadow-lg hover:shadow-pink-500/30'
-                }`}
+                disabled={watchingAd}
+                className="w-full py-2.5 text-sm font-bold rounded-xl transition-all bg-gradient-to-r from-pink-600 to-purple-600 text-white hover:shadow-lg hover:shadow-pink-500/30"
               >
-                {watchingAd ? 'Watching...' : adBoostActive ? '⚡ Boost Active' : '📺 Watch Ad'}
+                {watchingAd ? 'Watching...' : '📺 Watch Ad (+10)'}
               </button>
             </div>
           </div>

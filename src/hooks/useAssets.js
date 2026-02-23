@@ -74,11 +74,6 @@ export function useAssets(user, refreshProfile, profile) {
           ratePerSec = ratePerSec * (1 + (a.bonus_income_percent / 100))
         }
 
-        // Apply 2% Ad Boost if active
-        if (profile?.ad_boost_until && new Date(profile.ad_boost_until).getTime() > now) {
-          ratePerSec = ratePerSec * 1.02
-        }
-
         const lastCollect = new Date(a.last_collected_at).getTime()
         const elapsed     = Math.max(0, (now - lastCollect) / 1000)
         const cappedSecs  = Math.min(elapsed, 86400)
@@ -161,9 +156,6 @@ export function useAssets(user, refreshProfile, profile) {
       rate = rate * (1 + (a.bonus_income_percent / 100))
     }
     
-    if (profile?.ad_boost_until && new Date(profile.ad_boost_until).getTime() > Date.now()) {
-      rate = rate * 1.02
-    }
     return sum + rate
   }, 0)
 

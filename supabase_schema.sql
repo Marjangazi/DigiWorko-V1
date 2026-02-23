@@ -4,6 +4,11 @@
 -- ============================================================
 
 -- ─────────────────────────────────────────────────────────────
+-- 0. EXTENSIONS
+-- ─────────────────────────────────────────────────────────────
+create extension if not exists "uuid-ossp";
+
+-- ─────────────────────────────────────────────────────────────
 -- 1. PROFILES TABLE
 -- ─────────────────────────────────────────────────────────────
 create table if not exists profiles (
@@ -39,6 +44,25 @@ create policy "admin_update_all_profiles" on profiles for update using (
   exists (select 1 from profiles where id = auth.uid() and is_admin = true)
 );
 
+create or replace function trg_initialize_profile()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  -- Ensure balance starts at 7200 (matching AuthContext requirements) 
+  -- and is_admin starts as false, regardless of what is sent in the insert.
+  new.balance    := 7200;
+  new.is_admin   := false;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_on_profile_create on profiles;
+create trigger trg_on_profile_create
+  before insert on profiles
+  for each row execute function trg_initialize_profile();
+
 -- ─────────────────────────────────────────────────────────────
 -- 2. ASSETS CONFIG TABLE (Admin-controlled)
 -- ─────────────────────────────────────────────────────────────
@@ -68,17 +92,31 @@ create policy "assets_config_admin_all" on assets_config for all using (
   exists (select 1 from profiles where id = auth.uid() and is_admin = true)
 );
 
--- Insert default asset
-insert into assets_config (name, description, price_coins, monthly_roi, maintenance_fee, duration_days, icon)
-values (
-  'Riksha',
-  'Your first digital asset. Valid for 30 days.',
-  7200,
-  6,
-  1,
-  30,
-  '🛺'
-) on conflict do nothing;
+-- Insert default assets
+insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order)
+values 
+('Riksha', 'Starter asset. Low maintenance, steady earnings.', 7200, 6, 8, 2, 30, '🛺', 1),
+('CNG', 'Middle-tier transport. Higher daily returns.', 36000, 10, 12, 3, 30, '🛗', 2),
+('Truck', 'Heavy-duty earner. Great for scaling.', 72000, 12, 15, 3, 30, '🚚', 3),
+('Excavator', 'High-end mining asset. Maximum profitability.', 360000, 15, 20, 5, 45, '🏗️', 4)
+on conflict (id) do nothing; -- Note: using id or ensuring uniqueness if id is fixed. Since id is uuid, better to use name if it has unique constraint? 
+-- Actually, the table doesn't have unique constraint on name. I'll just use a merge-like approach or just insert.
+-- Re-defining insert to be safer:
+insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order)
+select 'Riksha', 'Starter asset.', 7200, 6, 8, 2, 30, '🛺', 1
+where not exists (select 1 from assets_config where name = 'Riksha');
+
+insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order)
+select 'CNG', 'Middle-tier transport.', 36000, 10, 12, 3, 30, '🛗', 2
+where not exists (select 1 from assets_config where name = 'CNG');
+
+insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order)
+select 'Truck', 'Heavy-duty earner.', 72000, 12, 15, 3, 30, '🚚', 3
+where not exists (select 1 from assets_config where name = 'Truck');
+
+insert into assets_config (name, description, price_coins, monthly_roi, worker_gross_gen, maintenance_fee, duration_days, icon, sort_order)
+select 'Excavator', 'High-end mining asset.', 360000, 15, 20, 5, 45, '🏗️', 4
+where not exists (select 1 from assets_config where name = 'Excavator');
 
 -- ─────────────────────────────────────────────────────────────
 -- 3. USER ASSETS TABLE
@@ -99,7 +137,8 @@ alter table user_assets enable row level security;
 drop policy if exists "user_assets_select" on user_assets;
 create policy "user_assets_select" on user_assets for select using (auth.uid() = user_id);
 drop policy if exists "user_assets_insert" on user_assets;
-create policy "user_assets_insert" on user_assets for insert with check (auth.uid() = user_id);
+-- Disabled for security: assets must be purchased via buy_asset() RPC
+-- create policy "user_assets_insert" on user_assets for insert with check (auth.uid() = user_id);
 drop policy if exists "user_assets_update" on user_assets;
 create policy "user_assets_update" on user_assets for update using (auth.uid() = user_id);
 drop policy if exists "admin_assets_all" on user_assets;
@@ -126,7 +165,8 @@ alter table transactions enable row level security;
 drop policy if exists "trx_select_own" on transactions;
 create policy "trx_select_own"  on transactions for select using (auth.uid() = user_id);
 drop policy if exists "trx_insert_own" on transactions;
-create policy "trx_insert_own"  on transactions for insert with check (auth.uid() = user_id);
+-- Disabled for security: transactions are recorded by the system via RPCs
+-- create policy "trx_insert_own"  on transactions for insert with check (auth.uid() = user_id);
 drop policy if exists "admin_trx_all" on transactions;
 create policy "admin_trx_all"   on transactions for all using (
   exists (select 1 from profiles where id = auth.uid() and is_admin = true)
@@ -189,28 +229,23 @@ begin
   end if;
 
   -- Get asset config
-  select ac.price_coins, ac.worker_gross_gen, ac.monthly_roi
-  into v_price_coins, v_monthly_roi
-  from assets_config ac
-  where ac.id = v_asset_id;
+  declare
+    v_worker_gross numeric;
+  begin
+    select price_coins, monthly_roi, worker_gross_gen
+    into v_price_coins, v_monthly_roi, v_worker_gross
+    from assets_config
+    where id = v_asset_id;
+
+    -- Use worker_gross_gen if available, otherwise fallback to monthly_roi
+    v_monthly_roi := coalesce(v_worker_gross, v_monthly_roi, 6);
+  end;
 
   -- Calculate seconds elapsed
   v_seconds_elapsed := extract(epoch from (now() - v_last_collected));
 
   -- Calculate rate per second: price * monthly_roi% / 30 days / 86400 seconds
-  -- Use worker_gross_gen if available, otherwise fallback to monthly_roi
-  v_monthly_roi := coalesce(v_monthly_roi, 6);
-  if exists (select 1 from assets_config where id = v_asset_id and worker_gross_gen is not null) then
-    select worker_gross_gen into v_monthly_roi from assets_config where id = v_asset_id;
-  end if;
-
   v_rate_per_sec := v_price_coins * (v_monthly_roi / 100.0) / 30.0 / 86400.0;
-
-  -- Apply 2% Boost if active
-  select ad_boost_until into v_ad_boost_until from profiles where id = v_user_id;
-  if v_ad_boost_until is not null and v_ad_boost_until > now() then
-    v_rate_per_sec := v_rate_per_sec * 1.02;
-  end if;
 
   -- Apply Flash Sale Bonus from user_assets
   declare
@@ -307,8 +342,15 @@ begin
   update profiles set balance = balance - v_final_price where id = v_user_id;
 
   -- Create user asset with bonus if applicable
-  insert into user_assets (user_id, asset_id, bonus_income_percent, type, release_date) 
-  values (v_user_id, p_asset_id, v_bonus, p_type, (case when p_type = 'investor' then now() + interval '30 days' else null end));
+  declare
+    v_duration int;
+  begin
+    select duration_days into v_duration from assets_config where id = p_asset_id;
+    v_duration := coalesce(v_duration, 30);
+
+    insert into user_assets (user_id, asset_id, bonus_income_percent, type, release_date) 
+    values (v_user_id, p_asset_id, v_bonus, p_type, (case when p_type = 'investor' then now() + (v_duration || ' days')::interval else null end));
+  end;
 
   -- Record transaction
   insert into transactions (user_id, amount, type, status, note)
@@ -463,6 +505,10 @@ language plpgsql
 security definer
 as $$
 begin
+  if not exists (select 1 from profiles where id = auth.uid() and is_admin = true) then
+    raise exception 'Unauthorized';
+  end if;
+
   update profiles
   set balance = balance + p_amount
   where id = p_user_id;
@@ -475,6 +521,10 @@ language plpgsql
 security definer
 as $$
 begin
+  if not exists (select 1 from profiles where id = auth.uid() and is_admin = true) then
+    raise exception 'Unauthorized';
+  end if;
+
   update profiles
   set tk_balance = coalesce(tk_balance, 0) + p_amount
   where id = p_user_id;
@@ -553,7 +603,8 @@ as $$
 declare
   v_user_id uuid := auth.uid();
   v_last_checkin timestamptz;
-  v_reward numeric := 100; -- Daily check-in reward
+  v_reward numeric := 0; 
+  v_daily_income numeric := 0;
 begin
   select last_checkin_at into v_last_checkin from profiles where id = v_user_id;
 
@@ -562,6 +613,17 @@ begin
     return json_build_object('success', false, 'error', 'Already checked in today. Please return later.');
   end if;
 
+  -- Calculate total daily income from active worker assets
+  -- Income per day = Price * (Monthly ROI / 100) / 30
+  select coalesce(sum((ac.price_coins * (coalesce(ac.worker_gross_gen, ac.monthly_roi) / 100.0) / 30.0)), 0)
+  into v_daily_income
+  from user_assets ua
+  join assets_config ac on ac.id = ua.asset_id
+  where ua.user_id = v_user_id and ua.status = 'active' and ua.type = 'worker';
+
+  -- Reward is 2x daily income, minimum 10 DGC to be fair to new users
+  v_reward := greatest(v_daily_income * 2, 10);
+
   -- Update balance and last_checkin_at
   update profiles 
   set balance = balance + v_reward, last_checkin_at = now() 
@@ -569,9 +631,9 @@ begin
 
   -- Record transaction
   insert into transactions (user_id, amount, type, status, note)
-  values (v_user_id, v_reward, 'daily_reward', 'completed', 'Daily Check-in Reward');
+  values (v_user_id, v_reward, 'daily_reward', 'completed', 'Daily Check-in Reward (2x Asset Income)');
 
-  return json_build_object('success', true, 'message', 'Daily check-in successful! +100 DGC', 'reward', v_reward);
+  return json_build_object('success', true, 'message', 'Daily check-in successful! +' || round(v_reward, 2) || ' DGC', 'reward', round(v_reward, 2));
 end;
 $$;
 
@@ -585,20 +647,16 @@ security definer
 as $$
 declare
   v_user_id uuid := auth.uid();
-  v_ad_boost timestamptz;
+  v_reward numeric := 10;
 begin
-  select ad_boost_until into v_ad_boost from profiles where id = v_user_id;
+  -- Update balance
+  update profiles set balance = balance + v_reward where id = v_user_id;
 
-  if v_ad_boost is not null and v_ad_boost > now() then
-    return json_build_object('success', false, 'error', 'Ad boost is already active!');
-  end if;
-
-  update profiles set ad_boost_until = now() + interval '24 hours' where id = v_user_id;
-
-  -- Optional: You can reward immediate DGC for watching an ad too
-  -- update profiles set balance = balance + 10 where id = v_user_id;
+  -- Record transaction
+  insert into transactions (user_id, amount, type, status, note)
+  values (v_user_id, v_reward, 'daily_reward', 'completed', 'Watched Advertisement Reward');
   
-  return json_build_object('success', true, 'message', 'Activated 2% Income Boost for 24 Hours!');
+  return json_build_object('success', true, 'message', 'Rewarded +10 DGC for watching ad!');
 end;
 $$;
 
@@ -733,7 +791,7 @@ alter table user_assets add column if not exists bonus_income_percent numeric de
 -- 18. TOURNAMENTS INFRASTRUCTURE
 -- ─────────────────────────────────────────────────────────────
 create table if not exists tournaments (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   game text not null default 'Free Fire',
   title text not null,
   entry_fee numeric not null default 0,
@@ -746,7 +804,7 @@ create table if not exists tournaments (
 );
 
 create table if not exists tournament_participants (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tournament_id uuid references tournaments(id) on delete cascade,
   user_id uuid references profiles(id) on delete cascade,
   created_at timestamptz default now(),
@@ -765,7 +823,8 @@ alter table tournament_participants enable row level security;
 drop policy if exists "anyone_select_participants" on tournament_participants;
 create policy "anyone_select_participants" on tournament_participants for select using (true);
 drop policy if exists "user_insert_participants" on tournament_participants;
-create policy "user_insert_participants" on tournament_participants for insert with check (auth.uid() = user_id);
+-- Disabled for security: tournament joining must be done via join_tournament() RPC
+-- create policy "user_insert_participants" on tournament_participants for insert with check (auth.uid() = user_id);
 
 -- ─────────────────────────────────────────────────────────────
 -- 19. RPC: join_tournament

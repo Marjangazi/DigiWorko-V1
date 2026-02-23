@@ -108,7 +108,7 @@ export default function Wallet() {
               <span className="text-4xl font-black text-accent-400">{(profile?.balance || 0).toLocaleString()}</span>
               <span className="text-accent-600 font-bold">DGC</span>
             </div>
-            <p className="text-dark-600 text-[10px] mt-2 relative z-10">1,000 DGC = 1 BDT (Internal Value)</p>
+            <p className="text-dark-600 text-[10px] mt-2 relative z-10">720 DGC = 1 BDT (Market Value)</p>
           </motion.div>
 
           {/* Info Card */}
@@ -216,8 +216,8 @@ export default function Wallet() {
           >
             <div className="mb-6 p-4 bg-accent-500/5 border border-accent-500/20 rounded-xl">
               <p className="text-white font-bold mb-1">Step 1: Send Money to bKash Personal</p>
-              <p className="text-accent-400 text-xl font-black mb-2">017XXXXXXXX</p>
-              <p className="text-dark-500 text-xs">Rate: 1 BDT = 1,000 Coins (Adjusted for game value)</p>
+              <p className="text-accent-400 text-xl font-black mb-2">01875354842</p>
+              <p className="text-dark-500 text-xs">Rate: 1 BDT = 720 Coins</p>
             </div>
             
             <form onSubmit={handleDeposit} className="space-y-4">

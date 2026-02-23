@@ -128,7 +128,7 @@ export default function Shop() {
           <div className="text-sm">
             <p className="text-white font-semibold mb-1">Micro-Economy Rules</p>
             <ul className="text-dark-400 space-y-0.5">
-              <li>• 1,000 DGC = 1 BDT (Deposit via bKash in the wallet)</li>
+              <li>• 720 DGC = 1 BDT (Deposit via bKash in the wallet)</li>
               <li>• Assets earn coins every second based on monthly ROI</li>
               <li>• <strong className="text-accent-400">Collect within 24h</strong> — missed earnings go to the owner</li>
               <li>• Daily maintenance fee auto-deducted from your balance</li>
