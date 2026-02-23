@@ -10,58 +10,64 @@ export function AuthProvider({ children }) {
   const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
-    // Check if we are in the middle of an OAuth redirect (hash contains tokens)
-    const hasHash = window.location.hash && (
-      window.location.hash.includes('access_token=') || 
-      window.location.hash.includes('error=')
-    );
+    // Determine if we are likely in an OAuth flow
+    const isReturningFromAuth = window.location.hash.includes('access_token=') || 
+                               window.location.hash.includes('error=');
 
-    console.log('Initial Auth Check - Hash present:', !!hasHash);
+    console.log('Auth Init: Processing hash?', isReturningFromAuth);
 
-    // Initial session check
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        console.log('Initial Session Fetch:', session ? 'User Found' : 'No Session');
-        if (session) {
-          setSession(session)
-          setUser(session.user)
-          ensureProfile(session.user)
-        } else if (!hasHash) {
-          // Only stop loading if there's no hash to process
-          // If there IS a hash, we wait for onAuthStateChange to fire
-          setLoading(false)
+    // Get initial session
+    const initAuth = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        if (initialSession) {
+          console.log('Session found on init');
+          setSession(initialSession);
+          setUser(initialSession.user);
+          await ensureProfile(initialSession.user);
+        } else if (!isReturningFromAuth) {
+          // If no session and not in OAuth flow, we are definitely done loading
+          setLoading(false);
         }
-      })
-      .catch(err => {
-        console.error('getSession error:', err)
-        if (!hasHash) setLoading(false)
-      })
+      } catch (err) {
+        console.error('Init Auth Error:', err);
+        setLoading(false);
+      }
+    };
+
+    initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth State Event:', event, session ? 'Session Active' : 'No Session');
+      async (event, currentSession) => {
+        console.log('Auth Event:', event);
         
-        setSession(session)
-        setUser(session?.user ?? null)
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
         
-        if (session?.user) {
-          await ensureProfile(session.user)
+        if (currentSession?.user) {
+          await ensureProfile(currentSession.user);
         } else {
-          setProfile(null)
-          // If we are not waiting for a hash, stop loading
-          if (!hasHash || event === 'SIGNED_OUT') setLoading(false)
+          setProfile(null);
+          // Only stop loading if we aren't waiting for a redirect token
+          if (!isReturningFromAuth || event === 'SIGNED_OUT') {
+            setLoading(false);
+          }
         }
       }
-    )
+    );
 
-    // Safety fallback: eventually stop loading anyway
-    const safetyTimeout = setTimeout(() => {
-      setLoading(false)
-    }, 6000)
+    // Fallback: If still loading after 5 seconds, force stop.
+    // This prevents the "Black Screen of Death"
+    const timer = setTimeout(() => {
+      setLoading(curr => {
+        if (curr) console.warn('Auth loading timed out - forcing start');
+        return false;
+      });
+    }, 5000);
 
     return () => {
-      clearTimeout(safetyTimeout)
-      subscription.unsubscribe()
+      clearTimeout(timer);
+      subscription.unsubscribe();
     }
   }, [])
 

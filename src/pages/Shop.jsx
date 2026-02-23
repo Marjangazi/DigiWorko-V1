@@ -8,7 +8,7 @@ import { useFlashSale } from '../hooks/useFlashSale'
 
 export default function Shop() {
   const { user, profile, refreshProfile } = useAuth()
-  const { shopItems, buying, buyAsset }   = useAssets(user, refreshProfile, profile)
+  const { shopItems, buying, buyAsset, loading }   = useAssets(user, refreshProfile, profile)
   const { flashSale, timeLeft, isVaultActive } = useFlashSale()
   const [msg, setMsg] = useState(null)
   const [activeTab, setActiveTab] = useState('assets') // 'assets' | 'external'
@@ -176,19 +176,23 @@ export default function Shop() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {shopItems.map(item => {
-                const basePrice   = item.price_coins
-                const currentPrice = isVaultActive ? basePrice - (basePrice * (flashSale.discount / 100)) : basePrice
+                const basePrice   = Number(item.price_coins || 0)
+                const flashDiscount = Number(flashSale?.discount || 0)
+                const flashBonus = Number(flashSale?.bonus || 0)
+                
+                const currentPrice = isVaultActive ? basePrice - (basePrice * (flashDiscount / 100)) : basePrice
                 
                 const isInvestor = selectedModes[item.id] === 'investor'
-                const roiToUse = isInvestor ? item.investor_roi : (item.worker_gross_gen || item.monthly_roi)
+                const roiToUse = Number(isInvestor ? (item.investor_roi || 0) : (item.worker_gross_gen || item.monthly_roi || 0))
                 
                 const baseEarn    = (basePrice * (roiToUse / 100)) / 30
-                const bonusEarn   = isVaultActive ? (basePrice * ((roiToUse + flashSale.bonus) / 100)) / 30 - baseEarn : 0
+                const bonusEarn   = isVaultActive ? (basePrice * ((roiToUse + flashBonus) / 100)) / 30 - baseEarn : 0
                 const dailyEarn   = baseEarn + bonusEarn
                 
-                const dailyMaint  = isInvestor ? 0 : (basePrice * (item.maintenance_fee / 100)) / 30
+                const dailyMaint  = isInvestor ? 0 : (basePrice * (Number(item.maintenance_fee || 0) / 100)) / 30
                 const netPerDay   = dailyEarn - dailyMaint
-                const canAfford   = (profile?.balance ?? 0) >= currentPrice
+                const userBalance = Number(profile?.balance || 0)
+                const canAfford   = userBalance >= currentPrice
                 
                 const isGold = isVaultActive
 

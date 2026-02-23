@@ -17,18 +17,19 @@ export function useAssets(user, refreshProfile, profile) {
 
   // Load shop items (assets_config)
   const loadShop = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('assets_config')
       .select('*')
       .eq('is_active', true)
       .order('sort_order')
+    if (error) console.error('loadShop error:', error)
     if (data) setShopItems(data)
   }, [])
 
   // Load user's assets with config joined
   const loadAssets = useCallback(async () => {
     if (!user) return
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('user_assets')
       .select(`
         *,
@@ -40,6 +41,7 @@ export function useAssets(user, refreshProfile, profile) {
       .eq('user_id', user.id)
       .in('status', ['active', 'paused'])
       .order('purchased_at')
+    if (error) console.error('loadAssets error:', error)
     if (data) setAssets(data)
   }, [user])
 
