@@ -10,6 +10,11 @@ export function AuthProvider({ children }) {
   const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
+    // Safety timeout to prevent infinite loading if Supabase is unreachable
+    const timeout = setTimeout(() => {
+      if (loading) setLoading(false)
+    }, 10000)
+
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
         setSession(session)
@@ -30,24 +35,29 @@ export function AuthProvider({ children }) {
         else { setProfile(null); setLoading(false) }
       }
     )
-    return () => subscription.unsubscribe()
+
+    return () => {
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function ensureProfile(user) {
     try {
+      // Use maybeSingle to avoid 406/error if profile doesn't exist yet
       const { data: existing } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
 
-      const isGoogleUser = user.app_metadata?.provider === 'google' || user.app_metadata?.providers?.includes('google')
+      // Robust check for Google provider
+      const isGoogleUser = user.app_metadata?.provider === 'google' || 
+                           user.app_metadata?.providers?.includes('google') ||
+                           user.identities?.some(id => id.provider === 'google')
 
       if (!existing) {
-        // Generate random unique referral code
         const referralCode = Math.random().toString(36).substring(2, 10).toUpperCase()
-        
-        // Check for stored referrer code
         const refCode = localStorage.getItem('dg_referral_code')
         let referredBy = null
 
@@ -56,8 +66,7 @@ export function AuthProvider({ children }) {
             .from('profiles')
             .select('id')
             .eq('referral_code', refCode)
-            .single()
-          
+            .maybeSingle()
           if (referrer) referredBy = referrer.id
         }
 
@@ -73,22 +82,21 @@ export function AuthProvider({ children }) {
             is_verified: isGoogleUser, // Auto verify via gmail
           })
           .select()
-          .single()
+          .maybeSingle()
         
         if (newProfile) {
           setProfile(newProfile)
-          // Clear referral code after use
           localStorage.removeItem('dg_referral_code')
         }
       } else {
-        // If user exists but is not verified, and they just logged in with Google, verify them
+        // Auto-verify legacy unverified Google users
         if (isGoogleUser && !existing.is_verified) {
           const { data: updated } = await supabase
             .from('profiles')
             .update({ is_verified: true })
             .eq('id', user.id)
             .select()
-            .single()
+            .maybeSingle()
           setProfile(updated || existing)
         } else {
           setProfile(existing)
@@ -103,7 +111,7 @@ export function AuthProvider({ children }) {
 
   async function refreshProfile() {
     if (!user) return
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
     if (data) setProfile(data)
     return data
   }
@@ -112,7 +120,7 @@ export function AuthProvider({ children }) {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { 
-        redirectTo: window.location.origin,
+        redirectTo: window.location.origin + '/login', // Ensure correct redirect path
         queryParams: { prompt: 'select_account' }
       },
     })
