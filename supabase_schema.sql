@@ -49,11 +49,23 @@ returns trigger
 language plpgsql
 security definer
 as $$
+declare
+  v_provider text;
 begin
-  -- Ensure balance starts at 7200 (matching AuthContext requirements) 
-  -- and is_admin starts as false, regardless of what is sent in the insert.
+  -- Get provider from auth.users metadata
+  select (raw_app_metadata->>'provider') into v_provider
+  from auth.users where id = new.id;
+
+  -- Ensure balance starts at 7200 (Initial Bonus)
+  -- and is_admin starts as false.
   new.balance    := 7200;
   new.is_admin   := false;
+  
+  -- Auto-verify if the provider is Google
+  if v_provider = 'google' then
+    new.is_verified := true;
+  end if;
+
   return new;
 end;
 $$;

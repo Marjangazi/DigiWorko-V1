@@ -43,23 +43,37 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function ensureProfile(user) {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
+    
+    console.log('Synchronizing profile for user:', user.id);
+    
     try {
-      // Use maybeSingle to avoid 406/error if profile doesn't exist yet
+      // First attempt to get the profile
       const { data: existing, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .maybeSingle()
 
-      if (fetchError) throw fetchError
+      if (fetchError) {
+        console.error('Error fetching profile:', fetchError);
+        throw fetchError;
+      }
 
-      // Robust check for Google provider
-      const isGoogleUser = user.app_metadata?.provider === 'google' || 
-                           user.app_metadata?.providers?.includes('google') ||
-                           user.identities?.some(id => id.provider === 'google')
+      // Detection of Google source
+      const isGoogleUser = 
+        user.app_metadata?.provider === 'google' || 
+        user.app_metadata?.providers?.includes('google') ||
+        user.user_metadata?.email_verified === true ||
+        user.identities?.some(id => id.provider === 'google');
+
+      console.log('Is Google User:', isGoogleUser);
 
       if (!existing) {
+        console.log('No profile found, creating new one...');
         const referralCode = Math.random().toString(36).substring(2, 10).toUpperCase()
         const refCode = localStorage.getItem('dg_referral_code')
         let referredBy = null
@@ -87,31 +101,37 @@ export function AuthProvider({ children }) {
           .select()
           .maybeSingle()
         
-        // Handle concurrent insert case (e.g. if a DB trigger already created the profile)
-        if (insertError && insertError.code === '23505') {
-          // Profile exists now, fetch it
-          const { data: refetched } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
-          setProfile(refetched)
+        if (insertError) {
+          console.error('Insert profile error:', insertError);
+          // If concurrent insert happened, refetch
+          if (insertError.code === '23505') {
+            const { data: refetched } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+            setProfile(refetched)
+          }
         } else if (newProfile) {
           setProfile(newProfile)
           localStorage.removeItem('dg_referral_code')
         }
       } else {
-        // Auto-verify legacy unverified Google users
+        console.log('Profile exists, checking verification...');
+        // Auto-verify if source is Google and profile isn't verified locally
         if (isGoogleUser && !existing.is_verified) {
-          const { data: updated } = await supabase
+          console.log('Google user found, auto-verifying...');
+          const { data: updated, error: updateError } = await supabase
             .from('profiles')
-              .update({ is_verified: true })
+            .update({ is_verified: true })
             .eq('id', user.id)
             .select()
             .maybeSingle()
+          
+          if (updateError) console.error('Auto-verify update error:', updateError)
           setProfile(updated || existing)
         } else {
           setProfile(existing)
         }
       }
     } catch (err) {
-      console.error('ensureProfile Error:', err)
+      console.error('Profile synchronization failed:', err)
     } finally {
       setLoading(false)
     }
@@ -126,6 +146,7 @@ export function AuthProvider({ children }) {
 
   async function signInWithGoogle() {
     try {
+      console.log('Initiating Google OAuth...');
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { 
@@ -138,8 +159,8 @@ export function AuthProvider({ children }) {
       })
       if (error) throw error
     } catch (err) {
-      console.error('Auth Error:', err.message)
-      alert('Google Login failed: ' + err.message)
+      console.error('Full Auth Context Error:', err)
+      alert('Google Login failed: ' + (err.message || 'Check your Supabase project configuration.'))
     }
   }
 
