@@ -10,12 +10,17 @@ export function AuthProvider({ children }) {
   const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      if (session?.user) ensureProfile(session.user)
-      else setLoading(false)
-    })
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session)
+        setUser(session?.user ?? null)
+        if (session?.user) ensureProfile(session.user)
+        else setLoading(false)
+      })
+      .catch(err => {
+        console.error('getSession error:', err)
+        setLoading(false)
+      })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {

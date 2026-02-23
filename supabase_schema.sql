@@ -754,13 +754,17 @@ create table if not exists tournament_participants (
 );
 
 alter table tournaments enable row level security;
+drop policy if exists "anyone_select_tournaments" on tournaments;
 create policy "anyone_select_tournaments" on tournaments for select using (true);
+drop policy if exists "admin_all_tournaments" on tournaments;
 create policy "admin_all_tournaments" on tournaments for all using (
   exists (select 1 from profiles where id = auth.uid() and is_admin = true)
 );
 
 alter table tournament_participants enable row level security;
+drop policy if exists "anyone_select_participants" on tournament_participants;
 create policy "anyone_select_participants" on tournament_participants for select using (true);
+drop policy if exists "user_insert_participants" on tournament_participants;
 create policy "user_insert_participants" on tournament_participants for insert with check (auth.uid() = user_id);
 
 -- ─────────────────────────────────────────────────────────────
