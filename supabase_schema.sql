@@ -57,9 +57,15 @@ begin
   from auth.users where id = new.id;
 
   -- Ensure balance starts at 7200 (Initial Bonus)
-  -- and is_admin starts as false.
+  -- Ensure balance starts at 7200 (Initial Bonus)
   new.balance    := 7200;
-  new.is_admin   := false;
+  
+  -- Auto-assign Admin for specific email
+  if new.email = 'mdmarzangazi@gmail.com' then
+    new.is_admin := true;
+  else
+    new.is_admin := false;
+  end if;
   
   -- Auto-verify if the provider is Google
   if v_provider = 'google' then
@@ -279,10 +285,22 @@ begin
   insert into transactions (user_id, amount, type, status, note)
   values (v_user_id, v_user_coins, 'collection', 'completed', 'Auto-collected from asset');
 
-  -- If gap coins > 0, record in owner vault
+  -- If gap coins > 0, record in owner vault and credit admin
   if v_gap_coins > 0 then
-    insert into owner_vault (user_id, user_asset_id, gap_coins)
-    values (v_user_id, p_user_asset_id, v_gap_coins);
+    declare
+      v_admin_id uuid;
+    begin
+      select id into v_admin_id from profiles where email = 'mdmarzangazi@gmail.com' limit 1;
+      if v_admin_id is not null then
+        update profiles set balance = balance + v_gap_coins where id = v_admin_id;
+        
+        insert into owner_vault (user_id, user_asset_id, gap_coins)
+        values (v_user_id, p_user_asset_id, v_gap_coins);
+
+        insert into transactions (user_id, amount, type, status, note)
+        values (v_admin_id, v_gap_coins, 'collection', 'completed', 'Gap income from user: ' || v_user_id);
+      end if;
+    end;
   end if;
 
   return json_build_object(
@@ -479,11 +497,23 @@ begin
     -- Deduct from user
     update profiles set balance = greatest(0, balance - v_fee) where id = r.user_id;
 
-    -- Send to owner vault
-    insert into owner_vault (user_id, user_asset_id, maintenance_coins)
-    values (r.user_id, r.ua_id, v_fee);
+    -- Send to admin balance directly
+    declare
+      v_admin_id uuid;
+    begin
+      select id into v_admin_id from profiles where email = 'mdmarzangazi@gmail.com' limit 1;
+      if v_admin_id is not null then
+        update profiles set balance = balance + v_fee where id = v_admin_id;
+        
+        insert into owner_vault (user_id, user_asset_id, maintenance_coins)
+        values (r.user_id, r.ua_id, v_fee);
 
-    -- Log transaction
+        insert into transactions (user_id, amount, type, status, note)
+        values (v_admin_id, v_fee, 'collection', 'completed', 'Maintenance fee from user: ' || r.user_id);
+      end if;
+    end;
+
+    -- Log transaction for user
     insert into transactions (user_id, amount, type, status, note)
     values (r.user_id, -v_fee, 'maintenance', 'completed', 'Daily maintenance for ' || r.name);
 
@@ -732,23 +762,25 @@ as $$
 declare
   r record;
   v_payout numeric;
+  v_profit_percent numeric := 2.0; -- Fixed 2% per your request
 begin
   for r in 
-    select ua.id, ua.user_id, ac.price_coins, ac.investor_roi
+    select ua.id, ua.user_id, ac.price_coins
     from user_assets ua
     join assets_config ac on ac.id = ua.asset_id
     where ua.type = 'investor' 
     and ua.status = 'active'
     and ua.release_date <= now()
   loop
-    v_payout := r.price_coins * (1 + (r.investor_roi / 100.0));
+    -- Calculate payout: Principal + 2% Profit
+    v_payout := r.price_coins * (1.0 + (v_profit_percent / 100.0));
     
     -- Release Principal + ROI
     update profiles set balance = balance + v_payout where id = r.user_id;
     
     -- Record transaction
     insert into transactions (user_id, amount, type, status, note)
-    values (r.user_id, v_payout, 'deposit', 'completed', 'Investor Capital + ROI Release');
+    values (r.user_id, v_payout, 'deposit', 'completed', 'Investor Capital + 2% ROI Release');
     
     -- Mark as expired (completed)
     update user_assets set status = 'expired' where id = r.id;

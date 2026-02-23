@@ -183,7 +183,7 @@ export default function Shop() {
                 const currentPrice = isVaultActive ? basePrice - (basePrice * (flashDiscount / 100)) : basePrice
                 
                 const isInvestor = selectedModes[item.id] === 'investor'
-                const roiToUse = Number(isInvestor ? (item.investor_roi || 0) : (item.worker_gross_gen || item.monthly_roi || 0))
+                const roiToUse = isInvestor ? 2 : (item.worker_gross_gen || item.monthly_roi || 0)
                 
                 const baseEarn    = (basePrice * (roiToUse / 100)) / 30
                 const bonusEarn   = isVaultActive ? (basePrice * ((roiToUse + flashBonus) / 100)) / 30 - baseEarn : 0
@@ -242,7 +242,7 @@ export default function Shop() {
                     {(!selectedModes[item.id] || selectedModes[item.id] === 'worker') ? (
                       <>
                         <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                          <span className="text-[10px] text-dark-500 uppercase font-bold">Gross Monthly ROI</span>
+                          <span className="text-[10px] text-dark-500 uppercase font-bold">Monthly Gross (Part B)</span>
                           <span className="font-bold text-primary-400">{item.worker_gross_gen}%</span>
                         </div>
                         <div className="flex justify-between items-center py-1.5 border-b border-white/5">
@@ -250,30 +250,30 @@ export default function Shop() {
                           <span className="font-bold text-red-500">-{item.maintenance_fee}%</span>
                         </div>
                         <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                          <span className="text-[10px] text-dark-500 uppercase font-bold">Daily Earnings</span>
-                          <span className="font-bold text-green-400">+{((basePrice * (item.worker_gross_gen / 100)) / 30).toFixed(1)} DGC</span>
+                          <span className="text-[10px] text-dark-500 uppercase font-bold">Income</span>
+                          <span className="font-bold text-green-400">Collect Daily</span>
                         </div>
                         <div className="flex justify-between items-center py-1.5 pt-3">
-                          <span className="text-xs text-white font-black uppercase">Net Profit / Month</span>
+                          <span className="text-xs text-white font-black uppercase">Net ROI / Month</span>
                           <span className="font-black text-primary-400">{(item.worker_gross_gen - item.maintenance_fee).toFixed(1)}%</span>
                         </div>
                       </>
                     ) : (
                       <>
                         <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                          <span className="text-[10px] text-dark-500 uppercase font-bold">Total Return (30 Days)</span>
-                          <span className="font-bold text-accent-400">{item.investor_roi}% Fixed</span>
+                          <span className="text-[10px] text-dark-500 uppercase font-bold">Fixed Profit (Part A)</span>
+                          <span className="font-bold text-accent-400">2% / Month</span>
                         </div>
                         <div className="flex justify-between items-center py-1.5 border-b border-white/5">
                           <span className="text-[10px] text-dark-500 uppercase font-bold">Capital Status</span>
-                          <span className="font-bold text-white">Full Capital Returned</span>
+                          <span className="font-bold text-white">Full Refund after 30d</span>
                         </div>
                         <div className="flex justify-between items-center py-1.5 border-b border-white/5">
                           <span className="text-[10px] text-dark-500 uppercase font-bold">Total Release</span>
-                          <span className="font-bold text-green-400">{(basePrice * (1 + (item.investor_roi / 100))).toLocaleString()} DGC</span>
+                          <span className="font-bold text-green-400">{(basePrice * 1.02).toLocaleString()} DGC</span>
                         </div>
                         <div className="mt-4 p-2 bg-accent-500/5 border border-accent-500/20 rounded-lg text-[9px] text-accent-400 leading-tight">
-                          🔒 Note: Capital + Commission will be locked for 30 days and auto-released to your wallet.
+                          🔒 Investor Mode: Principal and 2% Interest will be returned to your wallet automatically after 30 days.
                         </div>
                       </>
                     )}

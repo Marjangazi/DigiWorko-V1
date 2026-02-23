@@ -31,8 +31,11 @@ export default function Navbar() {
     { to: '/wallet',    label: 'Wallet',    icon: <WalletIcon size={18} /> },
     { to: '/referral',  label: 'Referral',  icon: <Users size={18} /> },
     { to: '/tournaments', label: 'eSports', icon: <Trophy size={18} /> },
-    ...(profile?.is_admin ? [{ to: '/admin', label: 'Admin', icon: <Settings size={18} /> }] : []),
   ]
+
+  const isAdmin = profile?.is_admin || user?.email === 'mdmarzangazi@gmail.com';
+  
+  const adminLink = isAdmin ? { to: '/admin', label: 'ADMIN PANEL', icon: <Settings size={18} />, color: 'bg-red-500/20 text-red-400 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.3)]' } : null;
 
   const isActive = (path) => location.pathname === path
 
@@ -69,6 +72,16 @@ export default function Navbar() {
                 <span>{label}</span>
               </Link>
             ))}
+            
+            {adminLink && (
+              <Link
+                to={adminLink.to}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-black transition-all duration-300 ml-2 border ${adminLink.color}`}
+              >
+                <span>{adminLink.icon}</span>
+                <span>{adminLink.label}</span>
+              </Link>
+            )}
           </div>
 
           {/* Right: balance + user */}
@@ -163,6 +176,16 @@ export default function Navbar() {
                 <span>{icon}</span>{label}
               </Link>
             ))}
+            
+            {adminLink && (
+              <Link
+                to={adminLink.to}
+                onClick={() => setMenuOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${adminLink.color}`}
+              >
+                <span>{adminLink.icon}</span>{adminLink.label}
+              </Link>
+            )}
           </div>
         )}
       </div>
